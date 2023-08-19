@@ -15,6 +15,10 @@ import argparse
 parser = argparse.ArgumentParser(description = "VQ-VAE");
 parser.add_argument('--data_dir', type=str, default='./data', dest='data_dir')
 parser.add_argument('--save_dir', type=str, default='./outputs' , dest='save_dir')
+parser.add_argument('--num_epoch', type=int, default=50 , dest='num_epoch')
+parser.add_argument('--batch_size', type=int, default=1 , dest='batch_size')
+parser.add_argument('--resnet_depth', type=int, default=6 , dest='batch_size')
+parser.add_argument('--nj', type=int, default=1 , dest='nj')
 args = parser.parse_args();
 
 #%%
@@ -27,7 +31,7 @@ embedding_dim=8192
 K = num_embeddings
 D = embedding_dim
 hidden_dims=[512, 2048, 8192]
-res_depth=1
+res_depth=args.resnet_depth
 beta = 0.25
 
 #train hparameters
@@ -37,9 +41,9 @@ beta = 0.25
 # LEARNING_RATE = args.LEARNING_RATE
 # RESUME_MODEL_NAME = args.RESUME_MODEL_NAME # IMFCC 
 # RESUME_LR = args.RESUME_LR
-EPOCH_NUM = 50
-BATCH_SIZE = 1
-NUM_WORKERS= 1
+EPOCH_NUM = args.num_epoch
+BATCH_SIZE = args.batch_size
+NUM_WORKERS= args.nj
 LEARNING_RATE = 0.01
 RESUME_MODEL_NAME = None
 RESUME_LR = 0.005
@@ -65,7 +69,7 @@ torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 random.seed(seed)
-# if __name__ == '__main__':
+# 
 
 
 #%%
@@ -207,3 +211,5 @@ def main(epc = 1):
 
 #%%
 
+if __name__ == '__main__':
+    main()

@@ -5,4 +5,4 @@ python vqvae_data_preparation.py --LJSpeech_dir C:/Users/YC/Desktop/TTS/data/LJS
 python vqvae_feat.py --data_dir ./data --save_dir ./feats
 
 ## train model
-python vqvae_train.py  --data_dir ./data --save_dir ./outputs
+python vqvae_train.py  --data_dir ./data --save_dir ./outputs --num_epoch 50 --batch_size 1 --resnet_depth 6 --nj 1
