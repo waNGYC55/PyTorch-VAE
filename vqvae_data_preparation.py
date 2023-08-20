@@ -31,4 +31,3 @@ if not os.path.exists(save_dir):
 with open(os.path.join(save_dir, 'wav.scp'), 'w') as f:
     for line in wavscp:
         f.write(' '.join(line)+'\n')
-# %%

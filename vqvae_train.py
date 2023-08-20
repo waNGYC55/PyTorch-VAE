@@ -12,12 +12,14 @@ from vqvae_dataloader import VQVAE_Mel_Dataset, MyDataLoader
 from vqvae_model import VQVAE
 
 import argparse
+
+#%%
 parser = argparse.ArgumentParser(description = "VQ-VAE");
-parser.add_argument('--data_dir', type=str, default='./data', dest='data_dir')
+parser.add_argument('--index_dir', type=str, default='./index', dest='index_dir')
 parser.add_argument('--save_dir', type=str, default='./outputs' , dest='save_dir')
 parser.add_argument('--num_epoch', type=int, default=50 , dest='num_epoch')
 parser.add_argument('--batch_size', type=int, default=1 , dest='batch_size')
-parser.add_argument('--resnet_depth', type=int, default=6 , dest='batch_size')
+parser.add_argument('--resnet_depth', type=int, default=6 , dest='resnet_depth')
 parser.add_argument('--nj', type=int, default=1 , dest='nj')
 args = parser.parse_args();
 
@@ -32,15 +34,10 @@ K = num_embeddings
 D = embedding_dim
 hidden_dims=[512, 2048, 8192]
 res_depth=args.resnet_depth
+# res_depth=1
 beta = 0.25
 
 #train hparameters
-# EPOCH_NUM = args.EPOCH_NUM
-# BATCH_SIZE = args.BATCH_SIZE
-# NUM_WORKERS= args.NUM_WORKERS
-# LEARNING_RATE = args.LEARNING_RATE
-# RESUME_MODEL_NAME = args.RESUME_MODEL_NAME # IMFCC 
-# RESUME_LR = args.RESUME_LR
 EPOCH_NUM = args.num_epoch
 BATCH_SIZE = args.batch_size
 NUM_WORKERS= args.nj
@@ -48,9 +45,18 @@ LEARNING_RATE = 0.01
 RESUME_MODEL_NAME = None
 RESUME_LR = 0.005
 
+# EPOCH_NUM = 50
+# BATCH_SIZE = 1
+# NUM_WORKERS= 1
+# LEARNING_RATE = 0.01
+# RESUME_MODEL_NAME = None
+# RESUME_LR = 0.005
+
 #file io variables
-data_dir = args.data_dir
+data_dir = args.index_dir
 save_dir=args.save_dir
+# data_dir ='./index'
+# save_dir='./outputs'
 NAME_SPACE = '_'.join(['vqvae','Mel'+str(in_channels),'K'+str(K),'D'+str(D)])
 SAVE_PATH = os.path.join(save_dir, "models")
 LOG_PATH = os.path.join(save_dir, "log")
@@ -60,8 +66,8 @@ if not os.path.exists(SAVE_PATH):
 LOG_FILE = LOG_PATH + "/" + NAME_SPACE + ".log"
 f_log = open(LOG_FILE, "wt")
 
-utt2wav = [line.split() for line in open(os.path.join(data_dir, 'feat.scp'))]
-
+train_utt2wav = [line.split() for line in open(os.path.join(data_dir, 'train.index'))]
+dev_utt2wav = [line.split() for line in open(os.path.join(data_dir, 'dev.index'))]
 
 #reproductivity
 seed=5
@@ -70,9 +76,23 @@ torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 random.seed(seed)
 # 
-
-
 #%%
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 def saveModel(epoch, temp=""):
     global net
@@ -120,12 +140,14 @@ def train(epc=1):
     global optimizer
 
     #data loader
-    vqvae_dataset = VQVAE_Mel_Dataset(utt2wav, need_aug=False, with_output=False, shuffle=False)
+    vqvae_dataset = VQVAE_Mel_Dataset(train_utt2wav, need_aug=False, with_output=False, shuffle=False)
     vqvae_dataloader = MyDataLoader(vqvae_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
 
     print('Training.....')
-    net.train()
+    status=net.train()
 
+    losses_avg = AverageMeter()
+    
     iteration_num = 0
 
     for batch_utt, batch_x in tqdm(vqvae_dataloader, total=len(vqvae_dataloader)):
@@ -141,11 +163,14 @@ def train(epc=1):
         overall_loss.backward()
         optimizer.step()
 
+        #update avg loss
+        losses_avg.update(overall_loss.data, batch_x.size()[0])
+
         if iteration_num % 30 == 29: 
             curr_log = '[%d, %5d] recon_loss: %.3f, vq_loss: %.3f. \n' % (epc, iteration_num + 1, recon_loss, vq_loss)
             tqdm.write(curr_log)
             f_log.write(curr_log)
-        return losses
+    return losses_avg.avg
 
     ## test code
     # batch_utt, batch_x=vqvae_dataset.__getitem__([0])
@@ -153,17 +178,18 @@ def train(epc=1):
     # batch_x = batch_handle(batch_x)
 
 # %%
-def validate(epc, utt2wav_dev):
+def validate(epc):
     global net
 
     print('Validate.....')
-    dev_dataset=VQVAE_Mel_Dataset(utt2wav_dev, need_aug=False, with_output=False, shuffle=False)
+    dev_dataset=VQVAE_Mel_Dataset(dev_utt2wav, need_aug=False, with_output=False, shuffle=False)
     dev_dataloader = MyDataLoader(dev_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
-    net.eval()
+    status=net.eval()
 
     overall_losses=[]
     recon_losses=[]
     vq_losses=[]
+
     with torch.no_grad():
         for batch_utt, batch_x in tqdm(dev_dataloader, total=len(dev_dataloader)):
             batch_x = batch_handle(batch_x)
@@ -175,15 +201,16 @@ def validate(epc, utt2wav_dev):
             vq_loss=losses['VQ_Loss'].cpu()
 
             overall_losses.append(overall_loss)
-            recon_loss.append(recon_loss)
-            vq_loss.append(vq_loss)
+            recon_losses.append(recon_loss)
+            vq_losses.append(vq_loss)
     
     overall_losses=np.concatenate(overall_losses)
     recon_losses=np.concatenate(recon_losses)
     vq_losses=np.concatenate(vq_losses)
     cur_log='Validate: (Average) overall Loss: %.3f, recon_loss: %.3f, vq_loss: %.3f. \n'% (np.mean(overall_losses), np.mean(recon_losses), np.mean(vq_losses))
-    print(cur_log)
+    tqdm.write(cur_log)
     f_log.write(cur_log)
+    return np.mean(overall_losses)
 
 # %%
 #nn network
@@ -202,8 +229,8 @@ def main(epc = 1):
 
     for epoch in range(epc, EPOCH_NUM + 1):
         print("Current running model [ " + NAME_SPACE + " ]")
-        losses_avg = train(epoch)
-        scheduler.step(losses_avg)
+        loss_avg = train(epoch)
+        scheduler.step(loss_avg)
         if epoch in [1, 3, 5] or epoch % 5 == 0: # epoch in [1, 3, 5, 10, 20, 30, 40, 50]:
             cur_val_losses_avg = validate(epoch)
             saveModel(epoch)

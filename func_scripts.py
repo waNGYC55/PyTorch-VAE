@@ -8,6 +8,19 @@ def file2list(filename):
             r.append(line.split())
     return r
 
+def file2dict(filename):
+    r={}
+    with open(filename) as f:
+        for line in f.readlines():
+            line=line.split()
+            r[line[0]]=line[1]
+    return r
+
+def list2file(l, filepath):
+    with open(filepath, 'w') as f:
+        for line in l:
+            f.write(' '.join(line)+'\n')
+
 #pytorch analysis
 def get_parameter_number(model):
     total_num=sum(p.numel() for p in model.parameters())
