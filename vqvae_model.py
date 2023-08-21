@@ -34,9 +34,7 @@ class VectorQuantizer(nn.Module):
         flat_latents = latents.view(-1, self.D)  # [BHW x D]
 
         # Compute L2 distance between latents and embedding weights
-        dist = torch.sum(flat_latents ** 2, dim=1, keepdim=True) + \
-               torch.sum(self.embedding.weight ** 2, dim=1) - \
-               2 * torch.matmul(flat_latents, self.embedding.weight.t())  # [BHW x K]
+        dist = torch.sum(flat_latents ** 2, dim=1, keepdim=True) + torch.sum(self.embedding.weight ** 2, dim=1) - 2 * torch.matmul(flat_latents, self.embedding.weight.t())  # [BHW x K]
 
         # Get the encoding that has the min distance
         encoding_inds = torch.argmin(dist, dim=1).unsqueeze(1)  # [BHW, 1]

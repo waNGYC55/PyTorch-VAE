@@ -8,4 +8,4 @@ python vqvae_feat.py --data_dir ./data --save_dir ./feats
 python vqvae_index.py --feat_dir ./data --save_dir ./index
 
 ## train model
-python vqvae_train.py --index_dir ./index --save_dir ./outputs --num_epoch 50 --batch_size 1 --resnet_depth 1 --nj 1
+python vqvae_train.py --index_dir ./index --save_dir ./outputs --num_epoch 100 --batch_size 64 --resnet_depth 6 --nj 4

@@ -29,3 +29,5 @@ def get_parameter_number(model):
 
 def get_element_memory(element):
     return element.element_size()* element.nelement()/1000/1024
+
+def model_check_nan()

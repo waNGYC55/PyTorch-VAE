@@ -4,7 +4,7 @@ import pandas as pd
 import argparse
 from func_scripts import file2dict, list2file
 import random
-
+import numpy as np
 #%%
 parser = argparse.ArgumentParser(description = "VQ-VAE");
 parser.add_argument('--feat_dir', type=str, default='./data', dest='data_dir')
@@ -38,3 +38,25 @@ for utt in test_utt:
 
 list2file(train, os.path.join(index_dir, 'train.index'))
 list2file(test, os.path.join(index_dir, 'test.index'))
+
+#%%
+# # check nan
+# from tqdm import tqdm
+# nan_list=[]
+# for utt in tqdm(feat.keys()):
+#     data=np.load(feat[utt])
+#     if np.sum(np.isnan(data))>0:
+#         nan_list.append(utt)
+
+# # %%
+## check zero
+from tqdm import tqdm
+zeros={}
+for utt in tqdm(feat.keys()):
+    data=np.load(feat[utt])
+    for i in data:
+        for j in i:
+            if j[0]==0:
+                zeros[utt]=1
+                break
+# %%

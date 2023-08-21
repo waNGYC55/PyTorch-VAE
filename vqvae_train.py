@@ -7,12 +7,13 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import datetime
+import math
 from tqdm import tqdm
 from vqvae_dataloader import VQVAE_Mel_Dataset, MyDataLoader
 from vqvae_model import VQVAE
 
 import argparse
-
+torch.autograd.set_detect_anomaly(True)
 #%%
 parser = argparse.ArgumentParser(description = "VQ-VAE");
 parser.add_argument('--index_dir', type=str, default='./index', dest='index_dir')
@@ -20,7 +21,7 @@ parser.add_argument('--save_dir', type=str, default='./outputs' , dest='save_dir
 parser.add_argument('--num_epoch', type=int, default=50 , dest='num_epoch')
 parser.add_argument('--batch_size', type=int, default=1 , dest='batch_size')
 parser.add_argument('--resnet_depth', type=int, default=6 , dest='resnet_depth')
-parser.add_argument('--nj', type=int, default=1 , dest='nj')
+parser.add_argument('--nj', type=int, default=0 , dest='nj')
 args = parser.parse_args();
 
 #%%
@@ -28,35 +29,36 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # torch.cuda.is_available()
 #model hparameters
 in_channels=80 # Mel
-num_embeddings=256 
-embedding_dim=8192
+num_embeddings=8196 
+embedding_dim=256
 K = num_embeddings
 D = embedding_dim
-hidden_dims=[512, 2048, 8192]
-res_depth=args.resnet_depth
-# res_depth=1
+hidden_dims=[128,256,256]
 beta = 0.25
 
 #train hparameters
 EPOCH_NUM = args.num_epoch
 BATCH_SIZE = args.batch_size
 NUM_WORKERS= args.nj
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.05
 RESUME_MODEL_NAME = None
 RESUME_LR = 0.005
+data_dir = args.index_dir
+save_dir=args.save_dir
+res_depth=args.resnet_depth
+
 
 # EPOCH_NUM = 50
 # BATCH_SIZE = 1
-# NUM_WORKERS= 1
+# NUM_WORKERS= 0
 # LEARNING_RATE = 0.01
 # RESUME_MODEL_NAME = None
 # RESUME_LR = 0.005
-
-#file io variables
-data_dir = args.index_dir
-save_dir=args.save_dir
+# res_depth=1
 # data_dir ='./index'
 # save_dir='./outputs'
+
+#file io variables
 NAME_SPACE = '_'.join(['vqvae','Mel'+str(in_channels),'K'+str(K),'D'+str(D)])
 SAVE_PATH = os.path.join(save_dir, "models")
 LOG_PATH = os.path.join(save_dir, "log")
@@ -67,7 +69,7 @@ LOG_FILE = LOG_PATH + "/" + NAME_SPACE + ".log"
 f_log = open(LOG_FILE, "wt")
 
 train_utt2wav = [line.split() for line in open(os.path.join(data_dir, 'train.index'))]
-dev_utt2wav = [line.split() for line in open(os.path.join(data_dir, 'dev.index'))]
+dev_utt2wav = [line.split() for line in open(os.path.join(data_dir, 'test.index'))]
 
 #reproductivity
 seed=5
@@ -160,23 +162,29 @@ def train(epc=1):
         overall_loss=losses['loss']
         recon_loss=losses['Reconstruction_Loss']
         vq_loss=losses['VQ_Loss']
+
+        #print(batch_utt, losses)
+
         overall_loss.backward()
         optimizer.step()
 
         #update avg loss
         losses_avg.update(overall_loss.data, batch_x.size()[0])
 
-        if iteration_num % 30 == 29: 
+        if iteration_num % 2 == 1: 
             curr_log = '[%d, %5d] recon_loss: %.3f, vq_loss: %.3f. \n' % (epc, iteration_num + 1, recon_loss, vq_loss)
             tqdm.write(curr_log)
             f_log.write(curr_log)
     return losses_avg.avg
 
     ## test code
-    # batch_utt, batch_x=vqvae_dataset.__getitem__([0])
-    # batch_x=batch_x.unsqueeze(0)
+    # batch_gen=iter(vqvae_dataloader)
+    # batch_utt, batch_x=next(batch_gen)
     # batch_x = batch_handle(batch_x)
 
+    ## check zero
+    #torch.count_nonzero(batch_x)==torch.numel(batch_x)
+    # 
 # %%
 def validate(epc):
     global net
@@ -186,9 +194,9 @@ def validate(epc):
     dev_dataloader = MyDataLoader(dev_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
     status=net.eval()
 
-    overall_losses=[]
-    recon_losses=[]
-    vq_losses=[]
+    overall_losses_avg = AverageMeter()
+    recon_losses_avg = AverageMeter()
+    vq_losses_avg = AverageMeter()
 
     with torch.no_grad():
         for batch_utt, batch_x in tqdm(dev_dataloader, total=len(dev_dataloader)):
@@ -199,18 +207,16 @@ def validate(epc):
             overall_loss=losses['loss'].cpu()
             recon_loss=losses['Reconstruction_Loss'].cpu()
             vq_loss=losses['VQ_Loss'].cpu()
+            #update avg loss
+            overall_losses_avg.update(overall_loss.data, batch_x.size()[0])
+            recon_losses_avg.update(recon_loss.data, batch_x.size()[0])
+            vq_losses_avg.update(vq_loss.data, batch_x.size()[0])
 
-            overall_losses.append(overall_loss)
-            recon_losses.append(recon_loss)
-            vq_losses.append(vq_loss)
     
-    overall_losses=np.concatenate(overall_losses)
-    recon_losses=np.concatenate(recon_losses)
-    vq_losses=np.concatenate(vq_losses)
-    cur_log='Validate: (Average) overall Loss: %.3f, recon_loss: %.3f, vq_loss: %.3f. \n'% (np.mean(overall_losses), np.mean(recon_losses), np.mean(vq_losses))
+    cur_log='Validate: (Average) overall Loss: %.3f, recon_loss: %.3f, vq_loss: %.3f. \n'% (overall_losses_avg.avg, recon_losses_avg.avg, vq_losses_avg.avg)
     tqdm.write(cur_log)
     f_log.write(cur_log)
-    return np.mean(overall_losses)
+    return overall_losses_avg.avg
 
 # %%
 #nn network
