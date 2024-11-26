@@ -65,8 +65,11 @@ class VQVAE_Dataset(Dataset):
         return 1      
 
     def __getitem__(self, sample_idx):
+        # try:
+        #     idx = int(sample_idx[0])
+        # except:
+        #     idx = sample_idx
         idx = int(sample_idx[0])
-        #idx = sample_idx
         assert 0 <= idx and idx < self.dataset_size, "invalid index"
         
         utt, filename = self.utt2data[idx]
@@ -87,26 +90,29 @@ class VQVAE_Mel_Dataset(VQVAE_Dataset):
         samples = self.sequence_size
         try:
             feat=np.load(filename)
-            if feat.shape[0] == samples:
+            if feat.shape[1] == samples:
                 new_feat = feat
-            elif feat.shape[0] > samples:
-                start_point = random.randrange(0, feat.shape[0] - samples)
-                new_feat = np.array(feat[start_point:start_point + samples,:,:])
+            elif feat.shape[1] > samples:
+                start_point = random.randrange(0, feat.shape[1] - samples)
+                new_feat = np.array(feat[:,start_point:start_point + samples])
                 #print(new_feat.shape)
             else:
-                new_feat = np.zeros((samples, feat.shape[1], feat.shape[2]))
-                pad_beg = int((samples - feat.shape[0])/ 2)
-                new_feat[pad_beg:pad_beg + feat.shape[0],:,:] = feat
+                new_feat = np.zeros((feat.shape[0], samples))
+                pad_beg = int((samples - feat.shape[1])/ 2)
+                new_feat[:,pad_beg:pad_beg + feat.shape[1]] = feat
                 #print(new_feat.shape)
-            assert new_feat.shape[0] == samples
-            return torch.tensor(new_feat, dtype=torch.float).squeeze(-1).permute(1,0)    
+            assert new_feat.shape[1] == samples
+            return torch.tensor(new_feat, dtype=torch.float)
         except:
             print(filename)
         return 1
     
     def __getitem__(self, sample_idx):
+        # try:
+        #     idx = int(sample_idx[0])
+        # except:
+        #     idx = sample_idx
         idx = int(sample_idx[0])
-        #idx = sample_idx
         assert 0 <= idx and idx < self.dataset_size, "invalid index"
         
         utt, filename = self.utt2data[idx]
@@ -122,8 +128,8 @@ class VQVAE_Mel_Dataset(VQVAE_Dataset):
 def test():
     batch_size = 1
     num_workers = 1
-    index_root_dir = './data'
-    utt2wav = [line.split() for line in open(os.path.join(index_root_dir, 'feat.scp'))]
+    index_root_dir = './index'
+    utt2wav = [line.split() for line in open(os.path.join(index_root_dir, 'train.index'))]
 
    
     dev_dataset = VQVAE_Mel_Dataset(utt2wav, need_aug=False, with_output=True, shuffle=False)

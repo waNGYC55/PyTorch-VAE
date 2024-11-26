@@ -1,6 +1,5 @@
 #%%
 import os, sys
-import pandas as pd
 import argparse
 from func_scripts import file2dict, list2file
 import random
@@ -50,13 +49,13 @@ list2file(test, os.path.join(index_dir, 'test.index'))
 
 # # %%
 ## check zero
-from tqdm import tqdm
-zeros={}
-for utt in tqdm(feat.keys()):
-    data=np.load(feat[utt])
-    for i in data:
-        for j in i:
-            if j[0]==0:
-                zeros[utt]=1
-                break
+# from tqdm import tqdm
+# zeros={}
+# for utt in tqdm(feat.keys()):
+#     data=np.load(feat[utt])
+#     for i in data:
+#         for j in i:
+#             if j[0]==0:
+#                 zeros[utt]=1
+#                 break
 # %%

@@ -62,6 +62,7 @@ class VectorQuantizer(nn.Module):
         else:
             return quantized_latents.permute(0, 3, 1, 2).contiguous(), vq_loss  # [B x D x H x W]
 
+#%%
 class ResidualLayer(nn.Module):
 
     def __init__(self,
@@ -70,9 +71,11 @@ class ResidualLayer(nn.Module):
         super(ResidualLayer, self).__init__()
         self.resblock = nn.Sequential(nn.Conv1d(in_channels, out_channels,
                                                 kernel_size=3, padding=1, bias=False),
+                                      nn.BatchNorm1d(out_channels),          
                                       nn.ReLU(True),
-                                      nn.Conv1d(out_channels, out_channels,
-                                                kernel_size=1, bias=False))
+                                      nn.Conv1d(out_channels, out_channels, kernel_size=1, bias=False),
+                                      nn.BatchNorm1d(out_channels),
+                                      )
 
     def forward(self, input: Tensor) -> Tensor:
         return input + self.resblock(input)
@@ -109,6 +112,7 @@ class VQVAE(BaseVAE):
                 nn.Sequential(
                     nn.Conv1d(in_channels, out_channels=h_dim,
                               kernel_size=4, stride=2, padding=1),
+                    nn.BatchNorm1d(h_dim),
                     nn.LeakyReLU())
             )
             in_channels = h_dim
@@ -117,6 +121,7 @@ class VQVAE(BaseVAE):
             nn.Sequential(
                 nn.Conv1d(in_channels, in_channels,
                           kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm1d(in_channels),
                 nn.LeakyReLU())
         )
 
@@ -128,6 +133,7 @@ class VQVAE(BaseVAE):
             nn.Sequential(
                 nn.Conv1d(in_channels, embedding_dim,
                           kernel_size=1, stride=1),
+                nn.BatchNorm1d(embedding_dim),
                 nn.LeakyReLU())
         )
 
@@ -146,6 +152,7 @@ class VQVAE(BaseVAE):
                           kernel_size=3,
                           stride=1,
                           padding=1),
+                nn.BatchNorm1d(self.hidden_dims[-1]),
                 nn.LeakyReLU())
         )
 
@@ -164,6 +171,7 @@ class VQVAE(BaseVAE):
                                        kernel_size=4,
                                        stride=2,
                                        padding=1),
+                    nn.BatchNorm1d(self.hidden_dims[i + 1]),
                     nn.LeakyReLU())
             )
 
@@ -173,7 +181,10 @@ class VQVAE(BaseVAE):
                                    out_channels=self.init_in_channels, # 3 for rgb image, 80 for audio mel
                                    kernel_size=4,
                                    stride=2, padding=1),
-                nn.Tanh()))
+                nn.BatchNorm1d(self.init_in_channels),
+                # nn.Linear(256, 256),
+                # nn.Tanh(),
+                ))
 
         self.decoder = nn.Sequential(*modules)
 
@@ -235,3 +246,7 @@ class VQVAE(BaseVAE):
         """
 
         return self.forward(x)[0]
+    
+
+#%%
+

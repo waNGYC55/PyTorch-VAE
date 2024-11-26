@@ -25,9 +25,7 @@ def list2file(l, filepath):
 def get_parameter_number(model):
     total_num=sum(p.numel() for p in model.parameters())
     trainable_num=sum(p.numel() for p in model.parameters() if p.requires_grad)
-    return {'Total': total_num, 'Trainable': trainable_num, 'Memory':total_num*4/1000/1024}
+    return {'Total': total_num, 'Trainable': trainable_num, 'Memory (MB)':total_num*4/1000/1024}
 
 def get_element_memory(element):
     return element.element_size()* element.nelement()/1000/1024
-
-def model_check_nan()

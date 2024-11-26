@@ -23,8 +23,12 @@ step_size=160
 n_mels=80
 n_fft=1024
 
-FeatMel=torchaudio.transforms.MelSpectrogram(sample_rate=sr,n_fft=n_fft, win_length=win_size, hop_length=step_size, n_mels=n_mels)
+from myutils.load_params import load_model_params
+from myutils.dsp import Wav2Mel
 
+#FeatMel=torchaudio.transforms.MelSpectrogram(sample_rate=sr,n_fft=n_fft, win_length=win_size, hop_length=step_size, n_mels=n_mels)
+config = load_model_params('./configs/feat_config.yaml')
+wav2mel=Wav2Mel(config)
 
 # %%
 wavscp=file2list(os.path.join(data_dir,'wav.scp'))
@@ -35,15 +39,15 @@ if not os.path.exists(save_dir):
 #%%
 featscp=[]
 for utt, wavpath in tqdm(wavscp):
-    sig, raw_sr=torchaudio.load(wavpath)
-    sig = torchaudio.functional.resample(sig, orig_freq=raw_sr, new_freq=sr)
-    feat=FeatMel(sig)
+    # sig, raw_sr=torchaudio.load(wavpath)
+    # sig = torchaudio.functional.resample(sig, orig_freq=raw_sr, new_freq=sr)
+    
 
     feats_save_path=os.path.join(save_dir, utt.replace('.wav','.npy'))
 
     if not os.path.exists(feats_save_path):
-        feats = FeatMel(sig)
-        feats = np.array(feats).T
+        feats, energy=wav2mel(wavpath)
+        feats = feats.numpy()
         np.save(feats_save_path, feats)
     
     featscp.append([utt, feats_save_path])
